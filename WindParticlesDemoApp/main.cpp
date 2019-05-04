@@ -1,4 +1,5 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
+
 #include <cstdio>
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
@@ -11,11 +12,10 @@
 
 #define PI 3.141592653589793f
 
-
 #define SafeRelease(x) if (x) { x->Release(); x = nullptr;}
 #define D3D_CALL(x) if(FAILED(x)){\
 	_com_error err(x);\
-	printf("Error: in file %s at line (%d), hr: %s", __FILE__, __LINE__, err.ErrorMessage());\
+	printf("Error: in file %s at line (%d), hr: %s\n", __FILE__, __LINE__, err.ErrorMessage());\
 	\
 	}
 
@@ -126,21 +126,27 @@ int main(int* argc, char** argv)
 
 	ID3D11Buffer* quadVBuffer;
 	
+	struct VertexPosTex
+	{
+		vec3 position;
+		vec2 texCoord;
+	};
+
+	VertexPosTex initialData[] =
+	{
+		{{ -0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f }},
+		{{ -0.5f,  0.5f, 0.0f }, { 0.0f, 1.0f }},
+		{{  0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f }},
+		{{  0.5f,  0.5f, 0.0f }, { 1.0f, 1.0f }}
+	};
+
 	D3D11_BUFFER_DESC vbd;
-	vbd.ByteWidth = sizeof(float) * 12;
+	vbd.ByteWidth = sizeof(initialData);
 	vbd.Usage = D3D11_USAGE_IMMUTABLE;
 	vbd.BindFlags= D3D11_BIND_VERTEX_BUFFER;
 	vbd.CPUAccessFlags = NULL;
 	vbd.MiscFlags = NULL;
 	vbd.StructureByteStride = 0;
-
-	float initialData[] =
-	{
-		-0.5f, -0.5f, 0.0f,
-		-0.5f, 0.5f, 0.0f,
-		0.5f, -0.5f, 0.0f,
-		0.5f, 0.5f, 0.0f
-	};
 
 	D3D11_SUBRESOURCE_DATA data;
 	data.pSysMem = initialData;
@@ -179,11 +185,12 @@ int main(int* argc, char** argv)
 	SafeRelease(psSource);
 
 	ID3D11InputLayout* iLayout;
-	D3D11_INPUT_ELEMENT_DESC iaDesc[] = {
-		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	D3D11_INPUT_ELEMENT_DESC iaDescs[] = {
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
-	D3D_CALL(device->CreateInputLayout(iaDesc, 1, vsSource->GetBufferPointer(), vsSource->GetBufferSize(), &iLayout));
+	D3D_CALL(device->CreateInputLayout(iaDescs, 2, vsSource->GetBufferPointer(), vsSource->GetBufferSize(), &iLayout));
 	SafeRelease(vsSource);
 
 	ID3D11RasterizerState* rs;
@@ -229,7 +236,7 @@ int main(int* argc, char** argv)
 
 		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-		UINT stride = sizeof(float) * 3;
+		UINT stride = sizeof(VertexPosTex);
 		UINT offset = 0;
 		context->IASetVertexBuffers(0, 1, &quadVBuffer, &stride, &offset);
 
