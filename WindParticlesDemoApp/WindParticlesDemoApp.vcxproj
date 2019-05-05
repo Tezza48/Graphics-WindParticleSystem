@@ -136,6 +136,15 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="vendor\implimentation.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="vendor\stb\stb_image.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="particleShader.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
