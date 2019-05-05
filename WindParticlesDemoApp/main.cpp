@@ -25,6 +25,12 @@ int height = 900;
 
 using namespace glm;
 
+namespace TextureLibrary
+{
+	const char* LEAF_FRONT = "res/images/leafFront.png";
+	const char* LEAF_BACK = "res/images/leafBack.png";
+}
+
 struct FrameBuffer
 {
 	mat4x4 world;
@@ -211,7 +217,7 @@ int main(int* argc, char** argv)
 			D3D11_TEXTURE_ADDRESS_WRAP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, borderColor, 0, D3D11_FLOAT32_MAX), &samplerState));
 
 	int imgWidth, imgHeight, imgBPP;
-	unsigned char * texData = stbi_load("res/images/leafFront.png", &imgWidth, &imgHeight, &imgBPP, STBI_rgb_alpha);
+	unsigned char * texData = stbi_load(TextureLibrary::LEAF_FRONT, &imgWidth, &imgHeight, &imgBPP, STBI_rgb_alpha);
 
 	ID3D11Texture2D* petalTex;
 	D3D_CALL(device->CreateTexture2D(&CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R8G8B8A8_UNORM, imgWidth, imgHeight, 1, 0, 
