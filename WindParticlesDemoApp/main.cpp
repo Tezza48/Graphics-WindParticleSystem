@@ -5,20 +5,16 @@
 #include <GLFW/glfw3native.h>
 #include <d3d11.h>
 #include <dxgi1_6.h>
-#include <comdef.h>
 #include <d3dcompiler.h>
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include "vendor/stb/stb_image.h"
+#include "Utilities.h"
+#include "GeometryHelper.h"
 
 #define PI 3.141592653589793f
 
-#define SafeRelease(x) if (x) { x->Release(); x = nullptr;}
-#define D3D_CALL(x) if(FAILED(x)){\
-	_com_error err(x);\
-	printf("Error: in file %s at line (%d), hr: %s\n", __FILE__, __LINE__, err.ErrorMessage());\
-	\
-	}
+
 
 int width = 1600;
 int height = 900;
@@ -113,40 +109,31 @@ int main(int* argc, char** argv)
 
 #pragma endregion Create Device and set up render pipeline
 
-	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vec4 clearColor { 0.0f, 0.0f, 0.0f, 1.0f };
 
 	ID3D11Buffer* quadVBuffer;
-	
-	struct VertexPosTex
-	{
-		vec3 position;
-		vec2 texCoord;
-	};
+	unsigned int numQuadVerts;
+	GeometryHelper::CreateQuadBuffer(device, quadVBuffer, &numQuadVerts, 0.2f);
 
-	VertexPosTex initialData[] =
-	{
-		{{ -0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f }},
-		{{ -0.5f,  0.5f, 0.0f }, { 0.0f, 1.0f }},
-		{{  0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f }},
-		{{  0.5f,  0.5f, 0.0f }, { 1.0f, 1.0f }}
-	};
-
-	D3D11_SUBRESOURCE_DATA data;
-	data.pSysMem = initialData;
-
-	D3D_CALL(device->CreateBuffer(&CD3D11_BUFFER_DESC(sizeof(initialData), D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), &data, &quadVBuffer));
+	ID3D11Buffer* gridVB;
+	unsigned int numGridVerts;
+	GeometryHelper::CreateGrid(device, gridVB, &numGridVerts);
 
 #pragma region Shader_Creation
 	ID3D11VertexShader* vShader;
 	ID3D11PixelShader* pShader;
-	ID3DBlob* error;
-	ID3DBlob* vsSource;
-	ID3DBlob* psSource;
+
+	ID3D11VertexShader* vGridShader;
+	ID3D11PixelShader* pGridShader;
 
 	unsigned int flags1 = 0;
 #if DEBUG || _DEBUG
 	flags1 |= D3D10_SHADER_DEBUG | D3D10_SHADER_SKIP_OPTIMIZATION;
 #endif
+
+	ID3DBlob* error;
+	ID3DBlob* vsSource;
+	ID3DBlob* psSource;
 
 	D3D_CALL(D3DCompileFromFile(L"particleShader.hlsl", 0, D3D_COMPILE_STANDARD_FILE_INCLUDE, "p0_VS", "vs_5_0", flags1, 0, &vsSource, &error));
 	if (error)
@@ -159,7 +146,6 @@ int main(int* argc, char** argv)
 	if (error)
 	{
 		std::puts(static_cast<char*>(error->GetBufferPointer()));
-
 		SafeRelease(error);
 	}
 
@@ -167,6 +153,26 @@ int main(int* argc, char** argv)
 	device->CreatePixelShader(psSource->GetBufferPointer(), psSource->GetBufferSize(), NULL, &pShader);
 	SafeRelease(psSource);
 
+	// Grid Shader
+	D3D_CALL(D3DCompileFromFile(L"gridShader.hlsl", 0, D3D_COMPILE_STANDARD_FILE_INCLUDE, "p0_VS", "vs_5_0", flags1, 0, &vsSource, &error));
+	if (error)
+	{
+		std::puts(static_cast<char*>(error->GetBufferPointer()));
+		SafeRelease(error);
+	}
+
+	D3D_CALL(D3DCompileFromFile(L"gridShader.hlsl", 0, D3D_COMPILE_STANDARD_FILE_INCLUDE, "p0_PS", "ps_5_0", flags1, 0, &psSource, &error));
+	if (error)
+	{
+		std::puts(static_cast<char*>(error->GetBufferPointer()));
+		SafeRelease(error);
+	}
+
+	device->CreateVertexShader(vsSource->GetBufferPointer(), vsSource->GetBufferSize(), NULL, &vGridShader);
+	device->CreatePixelShader(psSource->GetBufferPointer(), psSource->GetBufferSize(), NULL, &pGridShader);
+	SafeRelease(psSource);
+
+	// Pipeline State Objects
 	ID3D11InputLayout* iLayout;
 	D3D11_INPUT_ELEMENT_DESC iaDescs[] = {
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -182,15 +188,12 @@ int main(int* argc, char** argv)
 	ID3D11DepthStencilState* ds;
 	D3D_CALL(device->CreateDepthStencilState(&CD3D11_DEPTH_STENCIL_DESC(D3D11_DEFAULT), &ds));
 
-	context->VSSetShader(vShader, 0, 0);
 	context->IASetInputLayout(iLayout);
-
-	context->PSSetShader(pShader, 0, 0);
 
 	context->RSSetState(rs);
 	context->OMSetDepthStencilState(ds, 0);
 
-	auto view = lookAtLH(vec3(0.0f, 0.0f, -1.0f), vec3(), vec3(0.0f, 1.0f, 0.0f));
+	auto view = lookAtLH(vec3(0.0f, 2.0f, -1.0f), vec3(), vec3(0.0f, 1.0f, 0.0f));
 	auto proj = perspectiveLH(PI / 2.0f, static_cast<float>(width) / height, 0.01f, 1000.0f);
 
 	FrameBuffer perFrameBuffer =
@@ -254,15 +257,23 @@ int main(int* argc, char** argv)
 		glfwPollEvents();
 
 		context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-		context->ClearRenderTargetView(rtv, clearColor);
+		context->ClearRenderTargetView(rtv, value_ptr(clearColor));
 
-		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
 		UINT stride = sizeof(VertexPosTex);
 		UINT offset = 0;
-		context->IASetVertexBuffers(0, 1, &quadVBuffer, &stride, &offset);
 
-		context->Draw(4, 0);
+		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+		context->IASetVertexBuffers(0, 1, &quadVBuffer, &stride, &offset);
+		context->VSSetShader(vShader, 0, 0);
+		context->PSSetShader(pShader, 0, 0);
+		context->Draw(numQuadVerts, 0);
+
+		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+		context->IASetVertexBuffers(0, 1, &gridVB, &stride, &offset);
+		context->VSSetShader(vGridShader, 0, 0);
+		context->PSSetShader(pGridShader, 0, 0);
+		context->Draw(numGridVerts, 0);
 
 		// Swap Buffers
 		D3D_CALL(swapChain->Present(1, 0));
