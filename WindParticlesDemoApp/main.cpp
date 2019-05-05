@@ -111,9 +111,20 @@ int main(int* argc, char** argv)
 
 	vec4 clearColor { 0.0f, 0.0f, 0.0f, 1.0f };
 
-	ID3D11Buffer* quadVBuffer;
+	ID3D11Buffer* quadVBuffers[2];// perVertex, perInstance
 	unsigned int numQuadVerts;
-	GeometryHelper::CreateQuadBuffer(device, quadVBuffer, &numQuadVerts, 0.2f);
+	GeometryHelper::CreateQuadBuffer(device, quadVBuffers[0], &numQuadVerts, 0.2f);
+
+	mat4 worlds[100];
+	for (size_t i = 0; i < 100; i++)
+	{
+		worlds[i] = translate(mat4(1.0f), vec3((float)i, 0.0f, 0.0f));
+	}
+
+	D3D11_SUBRESOURCE_DATA instanceData;
+	instanceData.pSysMem = worlds;
+
+	device->CreateBuffer(&CD3D11_BUFFER_DESC(sizeof(mat4) * 100, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), &instanceData, &quadVBuffers[1]);
 
 	ID3D11Buffer* gridVB;
 	unsigned int numGridVerts;
@@ -153,6 +164,23 @@ int main(int* argc, char** argv)
 	device->CreatePixelShader(psSource->GetBufferPointer(), psSource->GetBufferSize(), NULL, &pShader);
 	SafeRelease(psSource);
 
+	// Pipeline State Objects
+	ID3D11InputLayout* iLayoutInstanced, *iLayout;
+	D3D11_INPUT_ELEMENT_DESC iaDescs[] = {
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+
+		// Instance Buffer
+		// makes float4x4 at POSITION1
+		{"POSITION", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
+		{"POSITION", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
+		{"POSITION", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
+		{"POSITION", 4, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
+	};
+
+	D3D_CALL(device->CreateInputLayout(iaDescs, 6, vsSource->GetBufferPointer(), vsSource->GetBufferSize(), &iLayoutInstanced));
+	SafeRelease(vsSource);
+
 	// Grid Shader
 	D3D_CALL(D3DCompileFromFile(L"gridShader.hlsl", 0, D3D_COMPILE_STANDARD_FILE_INCLUDE, "p0_VS", "vs_5_0", flags1, 0, &vsSource, &error));
 	if (error)
@@ -172,13 +200,6 @@ int main(int* argc, char** argv)
 	device->CreatePixelShader(psSource->GetBufferPointer(), psSource->GetBufferSize(), NULL, &pGridShader);
 	SafeRelease(psSource);
 
-	// Pipeline State Objects
-	ID3D11InputLayout* iLayout;
-	D3D11_INPUT_ELEMENT_DESC iaDescs[] = {
-		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	};
-
 	D3D_CALL(device->CreateInputLayout(iaDescs, 2, vsSource->GetBufferPointer(), vsSource->GetBufferSize(), &iLayout));
 	SafeRelease(vsSource);
 
@@ -188,12 +209,11 @@ int main(int* argc, char** argv)
 	ID3D11DepthStencilState* ds;
 	D3D_CALL(device->CreateDepthStencilState(&CD3D11_DEPTH_STENCIL_DESC(D3D11_DEFAULT), &ds));
 
-	context->IASetInputLayout(iLayout);
-
 	context->RSSetState(rs);
 	context->OMSetDepthStencilState(ds, 0);
 
-	auto view = lookAtLH(vec3(0.0f, 2.0f, -1.0f), vec3(), vec3(0.0f, 1.0f, 0.0f));
+	auto eyePos = vec3(0.0f, 1.0f, -3.0f);
+	auto view = lookAtLH(eyePos, vec3(), vec3(0.0f, 1.0f, 0.0f));
 	auto proj = perspectiveLH(PI / 2.0f, static_cast<float>(width) / height, 0.01f, 1000.0f);
 
 	FrameBuffer perFrameBuffer =
@@ -201,7 +221,7 @@ int main(int* argc, char** argv)
 		identity<mat4x4>(),
 		identity<mat4x4>(),
 		proj * view,
-		vec4(0.0f, 0.0f, -1.0f, 1.0f)
+		vec4(eyePos, 1.0f)
 	};
 
 	D3D11_SUBRESOURCE_DATA cbufferData;
@@ -260,17 +280,19 @@ int main(int* argc, char** argv)
 		context->ClearRenderTargetView(rtv, value_ptr(clearColor));
 
 
-		UINT stride = sizeof(VertexPosTex);
-		UINT offset = 0;
+		UINT strides[] = { sizeof(VertexPosTex), sizeof(mat4) };
+		UINT offsets[] = { 0, 0 };
 
 		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-		context->IASetVertexBuffers(0, 1, &quadVBuffer, &stride, &offset);
+		context->IASetInputLayout(iLayoutInstanced);
+		context->IASetVertexBuffers(0, 2, quadVBuffers, strides, offsets);
 		context->VSSetShader(vShader, 0, 0);
 		context->PSSetShader(pShader, 0, 0);
-		context->Draw(numQuadVerts, 0);
+		context->DrawInstanced(numQuadVerts, 100, 0, 0);
 
 		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-		context->IASetVertexBuffers(0, 1, &gridVB, &stride, &offset);
+		context->IASetInputLayout(iLayout);
+		context->IASetVertexBuffers(0, 1, &gridVB, &strides[0], &offsets[0]);
 		context->VSSetShader(vGridShader, 0, 0);
 		context->PSSetShader(pGridShader, 0, 0);
 		context->Draw(numGridVerts, 0);
@@ -291,10 +313,13 @@ int main(int* argc, char** argv)
 	SafeRelease(samplerState);
 	SafeRelease(rs);
 	SafeRelease(ds);
-	SafeRelease(iLayout);
+	SafeRelease(iLayoutInstanced);
 	SafeRelease(vShader);
 	SafeRelease(pShader);
-	SafeRelease(quadVBuffer);
+	for (auto& buffer : quadVBuffers)
+	{
+		SafeRelease(buffer);
+	}
 	SafeRelease(rtv);
 	SafeRelease(dsv);
 	SafeRelease(swapChain);

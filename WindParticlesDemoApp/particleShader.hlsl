@@ -11,8 +11,13 @@ cbuffer frameBuffer : register(b0)
 
 struct VS_IN
 {
-	float3 position : POSITION;
+	float3 position : POSITION0;
 	float2 texCoord : TEXCOORD;
+};
+
+struct VS_Instance_IN
+{
+	float4x4 world : POSITION1;
 };
 
 struct VS_OUT
@@ -21,10 +26,11 @@ struct VS_OUT
 	float2 texCoord: TEXCOORD;
 };
 
-VS_OUT p0_VS(VS_IN i)
+VS_OUT p0_VS(VS_IN i, VS_Instance_IN iInst, uint instanceID : SV_InstanceID)
 {
 	VS_OUT o;
-	o.position = mul(worldViewProj, float4(i.position, 1.0));
+	float4x4 instanceWorld = mul(worldViewProj, iInst.world);
+	o.position = mul(instanceWorld, float4(i.position, 1.0));
 	o.texCoord = i.texCoord;
 	return o;
 }
