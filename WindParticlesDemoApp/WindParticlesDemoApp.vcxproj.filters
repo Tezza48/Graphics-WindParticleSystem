@@ -24,6 +24,9 @@
     <ClCompile Include="GeometryHelper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ParticleEmitter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="vendor\stb\stb_image.h">
@@ -35,13 +38,15 @@
     <ClInclude Include="Utilities.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ParticleEmitter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureLibrary.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="particleShader.hlsl">
-      <Filter>Source Files</Filter>
-    </FxCompile>
-    <FxCompile Include="gridShader.hlsl">
-      <Filter>Source Files</Filter>
-    </FxCompile>
+    <None Include="particleShader.hlsl" />
+    <None Include="gridShader.hlsl" />
   </ItemGroup>
 </Project>
