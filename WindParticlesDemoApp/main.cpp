@@ -9,6 +9,7 @@
 #include <d3dcompiler.h>
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+#include "vendor/stb/stb_image.h"
 
 #define PI 3.141592653589793f
 
@@ -90,35 +91,19 @@ int main(int* argc, char** argv)
 	D3D_CALL(device->CreateRenderTargetView(backBuffer, 0, &rtv));
 	SafeRelease(backBuffer);
 
-	D3D11_TEXTURE2D_DESC dsd;
-	dsd.Width = width;
-	dsd.Height = height;
-	dsd.MipLevels = 1;
-	dsd.ArraySize = 1;
-	dsd.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	dsd.SampleDesc.Count = 1;
-	dsd.SampleDesc.Quality = 0;
-	dsd.Usage = D3D11_USAGE_DEFAULT;
-	dsd.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-	dsd.CPUAccessFlags = 0;
-	dsd.MiscFlags = 0;
-
 	ID3D11Texture2D* depthStencilBuffer;
-	D3D_CALL(device->CreateTexture2D(&dsd, 0, &depthStencilBuffer));
+	D3D_CALL(device->CreateTexture2D(&CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL, D3D11_USAGE_DEFAULT, 0, 1, 0, 0), 0, &depthStencilBuffer));
+	if (!depthStencilBuffer)
+	{
+		std::puts("Depth Stencil Buffer was not created\n");
+		return 0;
+	}
 	D3D_CALL(device->CreateDepthStencilView(depthStencilBuffer, 0, &dsv));
 	SafeRelease(depthStencilBuffer);
 
 	context->OMSetRenderTargets(1, &rtv, dsv);
 
-	D3D11_VIEWPORT vp;
-	vp.TopLeftX = 0.0f;
-	vp.TopLeftY = 0.0f;
-	vp.Width = static_cast<float>(width);
-	vp.Height = static_cast<float>(height);
-	vp.MinDepth = 0.0f;
-	vp.MaxDepth = 1.0f;
-
-	context->RSSetViewports(1, &vp);
+	context->RSSetViewports(1, &CD3D11_VIEWPORT(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)));
 
 #pragma endregion Create Device and set up render pipeline
 
@@ -140,18 +125,10 @@ int main(int* argc, char** argv)
 		{{  0.5f,  0.5f, 0.0f }, { 1.0f, 1.0f }}
 	};
 
-	D3D11_BUFFER_DESC vbd;
-	vbd.ByteWidth = sizeof(initialData);
-	vbd.Usage = D3D11_USAGE_IMMUTABLE;
-	vbd.BindFlags= D3D11_BIND_VERTEX_BUFFER;
-	vbd.CPUAccessFlags = NULL;
-	vbd.MiscFlags = NULL;
-	vbd.StructureByteStride = 0;
-
 	D3D11_SUBRESOURCE_DATA data;
 	data.pSysMem = initialData;
 
-	D3D_CALL(device->CreateBuffer(&vbd, &data, &quadVBuffer));
+	D3D_CALL(device->CreateBuffer(&CD3D11_BUFFER_DESC(sizeof(initialData), D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), &data, &quadVBuffer));
 
 #pragma region Shader_Creation
 	ID3D11VertexShader* vShader;
@@ -206,7 +183,6 @@ int main(int* argc, char** argv)
 
 	context->RSSetState(rs);
 	context->OMSetDepthStencilState(ds, 0);
-#pragma endregion 
 
 	auto view = lookAtLH(vec3(0.0f, 0.0f, -1.0f), vec3(), vec3(0.0f, 1.0f, 0.0f));
 	auto proj = perspectiveLH(PI / 2.0f, static_cast<float>(width) / height, 0.01f, 1000.0f);
@@ -226,6 +202,46 @@ int main(int* argc, char** argv)
 	device->CreateBuffer(&CD3D11_BUFFER_DESC(sizeof(FrameBuffer), D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE, 0, 0), &cbufferData, &cbFrameBuffer);
 
 	context->VSSetConstantBuffers(0, 1, &cbFrameBuffer);
+#pragma endregion
+
+#pragma region Texture
+	ID3D11SamplerState* samplerState;
+	float borderColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	D3D_CALL(device->CreateSamplerState(&CD3D11_SAMPLER_DESC(D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP, 
+			D3D11_TEXTURE_ADDRESS_WRAP, 0.0f, 1, D3D11_COMPARISON_ALWAYS, borderColor, 0, D3D11_FLOAT32_MAX), &samplerState));
+
+	int imgWidth, imgHeight, imgBPP;
+	unsigned char * texData = stbi_load("res/images/leafFront.png", &imgWidth, &imgHeight, &imgBPP, STBI_rgb_alpha);
+
+	ID3D11Texture2D* petalTex;
+	D3D_CALL(device->CreateTexture2D(&CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R8G8B8A8_UNORM, imgWidth, imgHeight, 1, 0, 
+			D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET, D3D11_USAGE_DEFAULT, 0, 1, 0, D3D11_RESOURCE_MISC_GENERATE_MIPS), NULL, &petalTex));
+	if (!petalTex)
+	{
+		std::puts("Texture was not successfully created\n");
+		return 0;
+	}
+
+	unsigned int rowPitch = (imgWidth * imgBPP) * sizeof(char);
+	context->UpdateSubresource(petalTex, 0, NULL, texData, rowPitch, 0);
+
+	ID3D11ShaderResourceView* textureView;
+	D3D_CALL(device->CreateShaderResourceView(petalTex, &CD3D11_SHADER_RESOURCE_VIEW_DESC(
+		D3D_SRV_DIMENSION_TEXTURE2D, DXGI_FORMAT_R8G8B8A8_UNORM), &textureView));
+	if (!textureView)
+	{
+		std::puts("Texture SRV was not successfully created\n");
+		return 0;
+	}
+
+	context->GenerateMips(textureView);
+
+	context->PSSetShaderResources(0, 1, &textureView);
+	context->PSSetSamplers(0, 1, &samplerState);
+
+	stbi_image_free(texData);
+
+#pragma endregion
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -253,6 +269,9 @@ int main(int* argc, char** argv)
 		context->OMSetRenderTargets(1, &rtv, dsv);
 	}
 
+	SafeRelease(petalTex);
+	SafeRelease(textureView);
+	SafeRelease(samplerState);
 	SafeRelease(rs);
 	SafeRelease(ds);
 	SafeRelease(iLayout);
