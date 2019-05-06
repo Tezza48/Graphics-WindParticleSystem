@@ -8,6 +8,8 @@
 #include <d3dcompiler.h>
 #include "GeometryHelper.h"
 
+using namespace std::chrono;
+
 ParticleEmitter::ParticleEmitter(ID3D11Device* device, ID3D11DeviceContext* context)
 {
 	perVertexBuffer = nullptr;
@@ -93,9 +95,10 @@ ParticleEmitter::ParticleEmitter(ID3D11Device* device, ID3D11DeviceContext* cont
 
 	GeometryHelper::CreateQuadBuffer(device, perVertexBuffer, &numQuadVerts, 0.2f);
 
-	for (size_t i = 0; i < 100; i++)
+	for (size_t i = 0; i < NUM_LEAVES; i++)
 	{
-		particles[i].position = glm::vec3((float)i, 0.0f, 0.0f);
+		float fi = static_cast<float>(i);
+		particles[i].position = glm::vec3(fi / 12.5f, 0.0f, sinf(fi * 157366583.0f) * 2.0f);
 	}
 
 	auto worlds = CalculateInstanceMatrices();
@@ -103,11 +106,13 @@ ParticleEmitter::ParticleEmitter(ID3D11Device* device, ID3D11DeviceContext* cont
 	D3D11_SUBRESOURCE_DATA instanceData;
 	instanceData.pSysMem = worlds;
 	
-	device->CreateBuffer(&CD3D11_BUFFER_DESC(sizeof(glm::mat4) * 100, D3D11_BIND_VERTEX_BUFFER, 
+	device->CreateBuffer(&CD3D11_BUFFER_DESC(sizeof(glm::mat4) * NUM_LEAVES, D3D11_BIND_VERTEX_BUFFER, 
 		D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), &instanceData, &perInstanceBuffer);
 
 	delete[] worlds;
 	worlds = nullptr;
+
+	lastTime = steady_clock::now();
 }
 
 
@@ -124,6 +129,28 @@ ParticleEmitter::~ParticleEmitter()
 
 void ParticleEmitter::Draw(ID3D11DeviceContext* context)
 {
+	// Update Particles
+	time_point<steady_clock> now = steady_clock::now();
+	duration<float> duration = now - lastTime;
+	lastTime = now;
+
+	for (auto & particle : particles)
+	{
+		particle.position.x += 1.0f * duration.count();
+		particle.position.x = fmod(particle.position.x, 4.0f);
+	}
+
+	D3D11_MAPPED_SUBRESOURCE instanceData;
+	D3D_CALL(context->Map(perInstanceBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instanceData));
+
+	glm::mat4 * worlds = CalculateInstanceMatrices();
+	memcpy(instanceData.pData, worlds, sizeof(glm::mat4) * 100);
+
+	context->Unmap(perInstanceBuffer, 0);
+
+	delete[] worlds;
+	worlds = nullptr;
+
 	if (generateMipmaps)
 	{
 		context->GenerateMips(textureSRV);
@@ -148,7 +175,7 @@ glm::mat4 * ParticleEmitter::CalculateInstanceMatrices() const
 {
 	glm::mat4* result = new glm::mat4[100];
 
-	for (size_t i = 0; i < 100; i++)
+	for (size_t i = 0; i < NUM_LEAVES; i++)
 	{
 		result[i] = glm::translate(glm::mat4(1.0f), particles[i].position);
 	}

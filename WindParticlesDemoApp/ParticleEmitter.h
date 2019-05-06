@@ -2,6 +2,7 @@
 #include <d3d11.h>
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
+#include <chrono>
 
 class ParticleEmitter
 {
@@ -27,7 +28,10 @@ class ParticleEmitter
 
 	unsigned int numQuadVerts;
 
-	Particle particles[100];
+	static const size_t NUM_LEAVES = 100;
+	Particle particles[NUM_LEAVES]; // particles array
+
+	std::chrono::time_point<std::chrono::steady_clock> lastTime;
 
 public:
 	ParticleEmitter(ID3D11Device * device, ID3D11DeviceContext* context);

@@ -33,9 +33,6 @@ struct FrameBuffer
 
 int main(int* argc, char** argv)
 {
-	Time::startTime = Time::lastFrame = Time::thisFrame = std::chrono::high_resolution_clock::now();
-
-
 #pragma region GLFW_Initialization
 	if (!glfwInit())
 	{
@@ -163,8 +160,8 @@ int main(int* argc, char** argv)
 	context->RSSetState(rs);
 	context->OMSetDepthStencilState(ds, 0);
 
-	auto eyePos = vec3(0.0f, 1.0f, -3.0f);
-	auto view = lookAtLH(eyePos, vec3(), vec3(0.0f, 1.0f, 0.0f));
+	auto eyePos = vec3(4.0f, 1.0f, -3.0f);
+	auto view = lookAtLH(eyePos, vec3(2.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
 	auto proj = perspectiveLH(PI / 2.0f, static_cast<float>(width) / height, 0.01f, 1000.0f);
 
 	FrameBuffer perFrameBuffer =
@@ -192,15 +189,10 @@ int main(int* argc, char** argv)
 
 	while (!glfwWindowShouldClose(window))
 	{
-		Time::lastFrame = Time::thisFrame;
-		Time::thisFrame = std::chrono::high_resolution_clock::now();
-
 		glfwPollEvents();
 
 		context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 		context->ClearRenderTargetView(rtv, value_ptr(clearColor));
-
-		emitter.Draw(context);
 
 		UINT strides[] = { sizeof(VertexPosTex), sizeof(mat4) };
 		UINT offsets[] = { 0, 0 };
@@ -211,6 +203,8 @@ int main(int* argc, char** argv)
 		context->VSSetShader(vGridShader, 0, 0);
 		context->PSSetShader(pGridShader, 0, 0);
 		context->Draw(numGridVerts, 0);
+
+		emitter.Draw(context);
 
 		// Swap Buffers
 		D3D_CALL(swapChain->Present(1, 0));
