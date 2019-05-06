@@ -14,12 +14,10 @@
 #include "Time.h"
 #include "ParticleEmitter.h"
 
-#define PI 3.141592653589793f
+constexpr auto PI = 3.141592653589793f;
 
-
-
-int width = 1600;
-int height = 900;
+int width = 1280;
+int height = 720;
 
 using namespace glm;
 
@@ -152,7 +150,8 @@ int main(int* argc, char** argv)
 	SafeRelease(vsSource);
 
 	ID3D11RasterizerState* rs;
-	D3D_CALL(device->CreateRasterizerState(&CD3D11_RASTERIZER_DESC(D3D11_DEFAULT), &rs));
+	D3D_CALL(device->CreateRasterizerState(&CD3D11_RASTERIZER_DESC(D3D11_FILL_SOLID, D3D11_CULL_NONE, true, 0, 0.0f,
+		0.0f, true, false, false, false), &rs));
 
 	ID3D11DepthStencilState* ds;
 	D3D_CALL(device->CreateDepthStencilState(&CD3D11_DEPTH_STENCIL_DESC(D3D11_DEFAULT), &ds));
@@ -160,14 +159,14 @@ int main(int* argc, char** argv)
 	context->RSSetState(rs);
 	context->OMSetDepthStencilState(ds, 0);
 
-	auto eyePos = vec3(4.0f, 1.0f, -3.0f);
-	auto view = lookAtLH(eyePos, vec3(2.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+	auto eyePos = vec3(8.0f, 2.0f, -4.0f);
+	auto view = lookAtLH(eyePos, vec3(eyePos.x, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
 	auto proj = perspectiveLH(PI / 2.0f, static_cast<float>(width) / height, 0.01f, 1000.0f);
 
 	FrameBuffer perFrameBuffer =
 	{
 		identity<mat4x4>(),
-		identity<mat4x4>(),
+		inverseTranspose(identity<mat4x4>()),
 		proj * view,
 		vec4(eyePos, 1.0f)
 	};

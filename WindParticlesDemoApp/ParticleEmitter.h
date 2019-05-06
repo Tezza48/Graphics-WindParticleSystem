@@ -3,12 +3,20 @@
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
 #include <chrono>
+#include <array>
 
 class ParticleEmitter
 {
 	struct Particle
 	{
 		glm::vec3 position;
+		float rotation;
+		float age;
+	};
+
+	struct PerInstanceData
+	{
+		glm::mat4 world;
 	};
 
 	union
@@ -18,18 +26,17 @@ class ParticleEmitter
 	};
 
 	ID3D11SamplerState* samplerState;
-	ID3D11ShaderResourceView* textureSRV;
+	ID3D11ShaderResourceView* textureFrontSRV;
+	ID3D11ShaderResourceView* textureBackSRV;
 
 	ID3D11VertexShader* vShader;
 	ID3D11PixelShader* pShader;
 	ID3D11InputLayout* iLayoutInstanced;
 
-	bool generateMipmaps;
-
 	unsigned int numQuadVerts;
 
-	static const size_t NUM_LEAVES = 100;
-	Particle particles[NUM_LEAVES]; // particles array
+	const float particleLifetime = 8.0f;
+	std::array<Particle, 100> particles; // particles array
 
 	std::chrono::time_point<std::chrono::steady_clock> lastTime;
 
@@ -40,6 +47,6 @@ public:
 	void Draw(ID3D11DeviceContext* context);
 
 private:
-	glm::mat4* CalculateInstanceMatrices() const;
+	PerInstanceData* CalculateInstanceMatrices() const;
 };
 

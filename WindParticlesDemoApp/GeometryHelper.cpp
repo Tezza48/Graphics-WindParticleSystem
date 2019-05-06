@@ -7,12 +7,12 @@ void GeometryHelper::CreateQuadBuffer(ID3D11Device* device, ID3D11Buffer*& quadV
 {
 	*numVerts = 4;
 
-	VertexPosTex initialData[] =
+	VertexPosTexNormal initialData[] =
 	{
-		{ vec3(-0.5f, -0.5f, 0.0f) * scale, { 0.0f, 0.0f } },
-		{ vec3(-0.5f,  0.5f, 0.0f) * scale, { 0.0f, 1.0f } },
-		{ vec3( 0.5f, -0.5f, 0.0f) * scale, { 1.0f, 0.0f } },
-		{ vec3( 0.5f,  0.5f, 0.0f) * scale, { 1.0f, 1.0f } }
+		{ vec3(-0.5f, -0.5f, 0.0f) * scale, vec2(0.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f) },
+		{ vec3(-0.5f,  0.5f, 0.0f) * scale, vec2(0.0f, 1.0f), vec3(0.0f, 0.0f, -1.0f) },
+		{ vec3( 0.5f, -0.5f, 0.0f) * scale, vec2(1.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f) },
+		{ vec3( 0.5f,  0.5f, 0.0f) * scale, vec2(1.0f, 1.0f), vec3(0.0f, 0.0f, -1.0f) }
 	};
 
 	D3D11_SUBRESOURCE_DATA data;
