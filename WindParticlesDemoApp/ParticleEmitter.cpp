@@ -60,14 +60,14 @@ ParticleEmitter::ParticleEmitter(ID3D11Device* device, ID3D11DeviceContext* cont
 	D3D11_INPUT_ELEMENT_DESC iaDescs[] = {
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 
 		// Instance Buffer
 		// makes float4x4 at POSITION1
 		{"POSITION", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
 		{"POSITION", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
 		{"POSITION", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
-		{"POSITION", 4, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1}
+		{"POSITION", 4, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1},
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 	};
 
 	D3D_CALL(device->CreateInputLayout(iaDescs, 7, vsSource->GetBufferPointer(), vsSource->GetBufferSize(), &iLayoutInstanced));
@@ -138,7 +138,7 @@ ParticleEmitter::ParticleEmitter(ID3D11Device* device, ID3D11DeviceContext* cont
 	D3D11_SUBRESOURCE_DATA instanceData;
 	instanceData.pSysMem = worlds;
 	
-	device->CreateBuffer(&CD3D11_BUFFER_DESC(sizeof(glm::mat4) * (unsigned int)particles.size(), D3D11_BIND_VERTEX_BUFFER,
+	device->CreateBuffer(&CD3D11_BUFFER_DESC(sizeof(PerInstanceData) * (unsigned int)particles.size(), D3D11_BIND_VERTEX_BUFFER,
 		D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), &instanceData, &perInstanceBuffer);
 
 	delete[] worlds;
@@ -195,7 +195,7 @@ void ParticleEmitter::Draw(ID3D11DeviceContext* context)
 	context->PSSetShaderResources(1, 1, &textureBackSRV);
 	context->PSSetSamplers(0, 1, &samplerState);
 
-	UINT strides[] = { sizeof(VertexPosTexNormal), sizeof(glm::mat4) };
+	UINT strides[] = { sizeof(VertexPosTex), sizeof(PerInstanceData) };
 	UINT offsets[] = { 0, 0 };
 
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -214,7 +214,8 @@ ParticleEmitter::PerInstanceData* ParticleEmitter::CalculateInstanceMatrices() c
 	{
 		auto translation = glm::translate(glm::mat4(1.0f), particles[i].position);
 		auto rotation = glm::angleAxis(particles[i].rotation, vec3(1.0f, 0.0f, 0.0f));
-		result[i].world = translation * glm::toMat4(rotation);
+		result[i].world = glm::toMat4(rotation) * translation;
+		result[i].normalW = vec3(0.0f, 0.0f, -1.0f) * (glm::mat3)glm::inverseTranspose(result[i].world);
 	}
 
 	return result;

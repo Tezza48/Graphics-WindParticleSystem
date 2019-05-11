@@ -25,7 +25,7 @@ struct FrameBuffer
 {
 	mat4x4 world;
 	mat4x4 worldInvTrans;
-	mat4x4 worldViewProj;
+	mat4x4 ViewProj;
 	vec4 eyePos;
 };
 
@@ -159,8 +159,8 @@ int main(int* argc, char** argv)
 	context->RSSetState(rs);
 	context->OMSetDepthStencilState(ds, 0);
 
-	auto eyePos = vec3(8.0f, 2.0f, -4.0f);
-	auto view = lookAtLH(eyePos, vec3(eyePos.x, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+	auto eyePos = vec3(-3.0f, 2.0f, -4.0f);
+	auto view = lookAtLH(eyePos, vec3(3.0, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
 	auto proj = perspectiveLH(PI / 2.0f, static_cast<float>(width) / height, 0.01f, 1000.0f);
 
 	FrameBuffer perFrameBuffer =
@@ -193,8 +193,8 @@ int main(int* argc, char** argv)
 		context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 		context->ClearRenderTargetView(rtv, value_ptr(clearColor));
 
-		UINT strides[] = { sizeof(VertexPosTex), sizeof(mat4) };
-		UINT offsets[] = { 0, 0 };
+		UINT strides[] = { sizeof(VertexPosTex) };
+		UINT offsets[] = { 0 };
 
 		context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 		context->IASetInputLayout(iLayout);

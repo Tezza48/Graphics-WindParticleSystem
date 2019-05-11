@@ -17,6 +17,7 @@ class ParticleEmitter
 	struct PerInstanceData
 	{
 		glm::mat4 world;
+		glm::vec3 normalW;
 	};
 
 	union
